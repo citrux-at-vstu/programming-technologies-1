@@ -1,5 +1,5 @@
 import requests
-from sqlalchemy import create_engine, Table, Column, String, Integer, MetaData
+from sqlalchemy import create_engine, Table, Column, String, MetaData, Integer
 from sqlalchemy.sql import select
 
 
@@ -17,25 +17,15 @@ class WeatherProvider:
             'format': 'json',
         }
         data = requests.get(prov_url, params).json()
-        # return [
-        #     {
-        #         'date': row['datetimeStr'][:10],
-        #         'mint': row['mint'],
-        #         'maxt': row['maxt'],
-        #         'location': 'Volgograd,Russia',
-        #         'humidity': row['humidity'],
-        #     }
-        #     for row in data['locations'][location]['values']
-        # ]
         return [
             {
-                'date': row['date'],
-                'mintempC': row['mintempC'],
-                'maxtempC': row['maxtempC'],
+                'date': row['date'][:10],
+                'mint': row['mintempC'],
+                'maxt': row['maxtempC'],
                 'location': 'Volgograd, Russia',
-                'humidity': row['humidity']
+                'humidity': row['hourly'][0]['humidity'],
             }
-            for row in data['date']['city']['value']
+            for row in data['data']['weather']
         ]
 
 class WorkWithDB:
@@ -45,7 +35,7 @@ class WorkWithDB:
     def create_table(self):
         engine = create_engine(self.engine_name)
         metadata = MetaData()
-        weather = Table(
+        new_weather = Table(
             'weather',
             metadata,
             Column('date', String),
@@ -54,17 +44,9 @@ class WorkWithDB:
             Column('location', String),
             Column('humidity', Integer),
         )
-        return weather, engine, metadata
+        return new_weather, engine, metadata
 
     def show(self, db_connect, weather):
         for row in db_connect.execute(select([weather])):
             print(row)
 
-new_db = WorkWithDB('sqlite:///weather.sqlite3')
-weather, engine, metadata = new_db.create_table()
-metadata.create_all(engine)
-db_connect = engine.connect()
-provider = WeatherProvider('e7506da2237c4758bfb91907202010')
-db_connect.execute(weather.insert(), provider.get_data('Volgograd', '2020-09-20', '2020-09-29',
-                                                       'http://api.worldweatheronline.com/premium/v1/past-weather.ashx'))
-new_db.show(db_connect, weather)
